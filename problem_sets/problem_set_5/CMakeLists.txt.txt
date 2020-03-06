@@ -1,0 +1,10 @@
+cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
+project(histogram)
+
+find_package(CUDA REQUIRED)
+
+file(GLOB sources *.cpp *.cu)
+file(GLOB headers *.h *.hpp *.cuh)
+
+
+CUDA_ADD_EXECUTABLE(histo.out ${sources} ${headers})
