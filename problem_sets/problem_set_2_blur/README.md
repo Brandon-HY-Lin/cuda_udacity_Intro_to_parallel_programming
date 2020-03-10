@@ -1,0 +1,2 @@
+
+This program related to the performance between array of structures (AoS) and structure of arrays (SoA). Please refer to this [video](https://www.youtube.com/watch?v=F44nv1RYsQ0&list=PLGvfHSgImk4aweyWlhBXNF6XISY3um82_&index=383)
