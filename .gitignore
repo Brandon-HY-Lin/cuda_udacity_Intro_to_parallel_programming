@@ -1,0 +1,6 @@
+.vs/
+out/
+*.db
+*.opendb
+*.ipch
+problem_sets/problem_set_5/.vs/problem_set_5/v16/.suo
