@@ -47,7 +47,7 @@ __global__ void scan_gpu(int* output, int* input, int size)
 	// move data to output shared memory
 	//	the begining of for-loop will swap index
 	shmem[index_out * size + tid] = input[tid];  // inclusive scan 
-	//shmem[index_out * size + tid] = (tid > 0) ? input[tid-1]: 0;  // inclusive scan 
+	//shmem[index_out * size + tid] = (tid > 0) ? input[tid-1]: 0;  // exclusive scan 
 	__syncthreads();
 
 	// scan
