@@ -1,6 +1,8 @@
 
 
 #include <iostream>
+#include <iomanip>
+#include <algorithm>
 #include <cuda.h>
 #include <cuda_runtime.h>
 
@@ -19,6 +21,7 @@ void check(T err, const char* const func, const char* const file, const int line
 
 template<typename T>
 void checkResultsExact(const T* const ref, const T* const gpu, size_t numElem)
+{
   //check that the GPU result matches the CPU result
   for (size_t i = 0; i < numElem; ++i) {
     if (ref[i] != gpu[i]) {

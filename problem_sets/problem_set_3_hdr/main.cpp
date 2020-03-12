@@ -9,7 +9,7 @@
 #include <algorithm>
 #include "compare.h"
 #include "cdf_cpu.h"
-#include "cdf_gpu.h"
+#include "cdf_gpu.cuh"
 #include "processing.cuh"
 int main (int argc, char **argv)
 {

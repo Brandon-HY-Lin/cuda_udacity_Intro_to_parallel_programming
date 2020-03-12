@@ -35,3 +35,21 @@ void loadImageHDR (const std::string &filename,
   *numRows = image.rows;
   *numCols = image.cols;
 }
+
+
+//output an exr file
+//assumed to already be BGR
+void saveImageHDR(const float* const image,
+	const size_t numRows, const size_t numCols,
+	const std::string& output_file)
+{
+	int sizes[2];
+	sizes[0] = numRows;
+	sizes[1] = numCols;
+
+	cv::Mat imageHDR(2, sizes, CV_32FC3, (void*)image);
+
+	imageHDR = imageHDR * 255;
+
+	cv::imwrite(output_file.c_str(), imageHDR);
+}
