@@ -153,14 +153,14 @@ __global__ void histogram_gpu(const float* const d_input, unsigned int* d_histo,
 __global__ void histogram_to_cdf(const unsigned int* d_histo, unsigned int* d_cdf, const unsigned int numBins)
 {
     
-    extern __shared__ unsigned int shmem[];
+    extern __shared__ unsigned int sdata[];
     int index_in = 1, index_out = 0;
     int tid = threadIdx.x;
 
     // move data from GPU memory to shared memory
     //  in the begining of for-loop, index_in and index_out will swap.
-    shmem[index_out * numBins + tid] = d_histo[tid];    // inclusive scan
-    //shmem[index_out * numBins + tid] = (tid > 0) ? d_histo[tid - 1] : 0; // exclusive scan
+    sdata[index_out * numBins + tid] = d_histo[tid];    // inclusive scan
+    //sdata[index_out * numBins + tid] = (tid > 0) ? d_histo[tid - 1] : 0; // exclusive scan
 
     __syncthreads();
 
@@ -170,18 +170,18 @@ __global__ void histogram_to_cdf(const unsigned int* d_histo, unsigned int* d_cd
             index_in = 1 - index_out;
 
             if (tid >= stride) {
-                shmem[index_out * numBins + tid] = shmem[index_in * numBins + tid] + 
-                                                    shmem[index_in * numBins + tid - stride];
+                sdata[index_out * numBins + tid] = sdata[index_in * numBins + tid] + 
+                                                    sdata[index_in * numBins + tid - stride];
             }
             else {
-                shmem[index_out * numBins + tid] = shmem[index_in * numBins + tid];
+                sdata[index_out * numBins + tid] = sdata[index_in * numBins + tid];
             }
 
             __syncthreads();
         }
     }
     
-    d_cdf[tid] = shmem[index_out * numBins + tid];
+    d_cdf[tid] = sdata[index_out * numBins + tid];
 }
 
 void cdf_gpu(const float* const d_logLuminance,

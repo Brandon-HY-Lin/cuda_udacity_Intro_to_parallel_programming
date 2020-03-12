@@ -1,3 +1,7 @@
+
+#include <iostream>
+#include <opencv2/opencv.hpp>
+
 void loadImageHDR (const std::string &filename,
 					float **imagePtr,
 					std::size_t *numRows, std::size_t *numCols)
