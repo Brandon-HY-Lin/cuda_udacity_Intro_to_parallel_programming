@@ -140,15 +140,15 @@ __global__ void histogram_gpu(const float* const d_input, unsigned int* d_histo,
     int index = threadIdx.x + blockIdx.x * blockDim.x;
     
     if (index < numElems) {
-        int bin = max((int)(numBins - 1),
-                        (int)((d_input[index] - min_val) / range_val * numBins));
+        int bin = (d_input[index] - min_val) * numBins / range_val;
+        bin = min(bin, numBins - 1);
 
         atomicAdd(&d_histo[bin], 1);
     }
 }
 
 /*
- * inclusive scan
+ * exclusive scan
  */
 __global__ void histogram_to_cdf(const unsigned int* d_histo, unsigned int* d_cdf, const unsigned int numBins)
 {
@@ -159,8 +159,8 @@ __global__ void histogram_to_cdf(const unsigned int* d_histo, unsigned int* d_cd
 
     // move data from GPU memory to shared memory
     //  in the begining of for-loop, index_in and index_out will swap.
-    sdata[index_out * numBins + tid] = d_histo[tid];    // inclusive scan
-    //sdata[index_out * numBins + tid] = (tid > 0) ? d_histo[tid - 1] : 0; // exclusive scan
+    //sdata[index_out * numBins + tid] = d_histo[tid];    // inclusive scan
+    sdata[index_out * numBins + tid] = (tid > 0) ? d_histo[tid - 1] : 0; // exclusive scan
 
     __syncthreads();
 
@@ -211,9 +211,12 @@ void cdf_gpu(const float* const d_logLuminance,
     // alloc GPU mem for histogram
     unsigned int* d_histo;
     checkCudaErrors(cudaMalloc(&d_histo, sizeof(unsigned int) * numBins));
+    checkCudaErrors(cudaMemset(d_histo, 0, sizeof(unsigned int) * numBins));
 
     // compute histogram
-    histogram_gpu<<<(numElems-1)/1024, 1024>>>(d_logLuminance, d_histo, 
+    int blockSize = 1024;
+    int gridSize = (numElems - 1) / 1024 + 1;
+    histogram_gpu<<<gridSize, blockSize>>>(d_logLuminance, d_histo, 
                                                 min_logLum, max_logLum,  (max_logLum - min_logLum),
                                                 numElems, numBins);
 
