@@ -4,6 +4,16 @@
 #include <cassert>
 
 template <typename T>
+void print_array(const T& array, int size)
+{
+	for (int i = 0; i < size; i++) {
+		std::cout << array[i] << ", ";
+	}
+
+	std::cout << std::endl;
+}
+
+template <typename T>
 void compare (const std::vector<T>& values, const std::vector<T>& ref_values)
 {
 	if (values.size() != ref_values.size()) {
@@ -77,6 +87,7 @@ void countSort(std::vector<int>& array, unsigned int exponent)
 
 	// move data to output upon cdf
 	for (int i = array.size() - 1; i >= 0; i--) {
+	//for (int i = 0; i < array.size(); i++) {
 		unsigned int digit = getDigit(array[i], exponent);	// d is in the range of [0..9].
 		int index = cdf[digit] - 1;
 
@@ -109,10 +120,21 @@ int main()
 
 	radix_sort_cpu(result);
 
+
 	std::vector<int> ref_result(array);
 	std::sort(ref_result.begin(), ref_result.end());
 
+
+	std::cout << "Result =    ";
+	print_array(result, result.size());
+
+	std::cout << "Reference = ";
+	print_array(ref_result, ref_result.size());
+
+	std::cout << std::endl;
 	compare<int>(result, ref_result);
+
+	
 
 	return 0;
 }
