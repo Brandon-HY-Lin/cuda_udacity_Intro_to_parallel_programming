@@ -1,7 +1,22 @@
-// Note std::unary_function and thrust::unary_function define the types of input and output only
-//
-// Because C++11 language support makes the functionality of unary_function obsolete, 
-//    its use is optional if C++11 language features are enabled.
+#include "processing.cuh"
+
+#include "utils.h"
+#include <cuda.h>
+#include <cuda_runtime.h>
+#include <string>
+#include <iostream>
+
+#include <thrust/device_vector.h>
+#include <thrust/copy.h>
+#include <thrust/transform.h>
+#include <thrust/functional.h>
+#include <thrust/reduce.h>
+#include <thrust/extrema.h>
+#include <thrust/iterator/constant_iterator.h>
+#include <thrust/sequence.h>
+
+#include "loadSaveImage.h"
+#include <stdio.h>
 // simple cross correlation kernel copied from Mike's IPython Notebook
 __global__ void naive_normalized_cross_correlation (
 	float*		d_response,
@@ -88,6 +103,57 @@ __global__ void naive_normalized_cross_correlation (
 		d_response[ image_index_1d ] = result_value;
 	}	
 }
+
+
+__global__ void remove_redness_from_coordinates (
+	const unsigned int* d_coordinates,
+	unsigned char* d_r,
+	unsigned char* d_b,
+	unsigned char* d_g,
+	unsigned char* d_r_output,
+	int	num_coordinates,
+	int	num_pixels_y,
+	int	num_pixels_x,
+	int	template_half_height,
+	int	template_half_width
+	)
+{
+	int ny              = num_pixels_y;
+	int nx              = num_pixels_x;
+	int global_index_1d = ( blockIdx.x * blockDim.x ) + threadIdx.x;
+
+	int imgSize = num_pixels_x * num_pixels_y;
+
+	if ( global_index_1d < num_coordinates ) {
+
+		unsigned int image_index_1d = d_coordinates[ imgSize - global_index_1d - 1];
+		ushort2 image_index_2d = make_ushort2( image_index_1d % num_pixels_x, image_index_1d / num_pixels_x);
+		
+		for (int y = image_index_2d.y - template_half_height; y <= image_index_2d.y + template_half_height; y++) {
+		
+			for (int x = image_index_2d.x - template_half_width; x <= image_index_2d.x + template_half_width; x++) {
+			
+				int2 image_offset_index_2d		= make_int2( x, y);
+				int2 image_offset_index_2d_clamped 	= make_int2( min(nx -1, max(0, image_offset_index_2d.x)), min( ny - 1, max( 0, image_offset_index_2d.y) ) );
+				int  image_offset_index_1d_clamped = (nx * image_offset_index_2d_clamped.y ) + image_offset_index_2d_clamped.x;
+				
+				unsigned char g_value = d_g[ image_offset_index_1d_clamped ];
+				unsigned char b_value = d_b[ image_offset_index_1d_clamped ];
+				
+				unsigned int gb_average = ( g_value + b_value ) / 2;
+				
+				d_r_output[ image_offset_index_1d_clamped ] = (unsigned char) gb_average;
+			}
+		}
+	
+	}
+}
+
+
+// Note std::unary_function and thrust::unary_function define the types of input and output only
+//
+// Because C++11 language support makes the functionality of unary_function obsolete, 
+//    its use is optional if C++11 language features are enabled.
 struct splitChannels : thrust::unary_function<uchar4, thrust::tuple<unsigned char, unsigned char, unsigned char> >
 {
 	__host__ __device__
@@ -96,6 +162,7 @@ struct splitChannels : thrust::unary_function<uchar4, thrust::tuple<unsigned cha
 		return thrust::make_tuple(pixel.x, pixel.y, pixel.z);
 	}
 };	
+
 
 struct combineChannels : thrust::unary_function<thrust::tuple<unsigned char, unsigned char, unsigned char>, uchar4>
 {
@@ -106,6 +173,7 @@ struct combineChannels : thrust::unary_function<thrust::tuple<unsigned char, uns
 	}
 };
 
+
 struct combineResponses : thrust::unary_function<float, thrust::tuple<float, float, float> >
 {
 	__host__ __device__
@@ -114,6 +182,7 @@ struct combineResponses : thrust::unary_function<float, thrust::tuple<float, flo
 		return thrust::get<0>(t) * thrust::get<1>(t) * thrust::get<2>(t);
 	}
 };
+
 
 // we need to save the input so we can remove the redeye for the output
 static thrust::device_vector<unsigned char> d_red;
@@ -278,4 +347,54 @@ void preProcess(unsigned int **inputVals,
 	cudaMemcpy(*inputPos, thrust::raw_pointer_cast(coords.data()), sizeof(unsigned int) * numElem, cudaMemcpyDeviceToDevice);
 	checkCudaErrors(cudaMemset(*outputVals, 0, sizeof(unsigned int) * numElem));
 	checkCudaErrors(cudaMemset(*outputPos, 0,  sizeof(unsigned int) * numElem));
+}
+
+
+void postProcess(const unsigned int* const outputVals,
+		const unsigned int* const outputPos,
+		const std::size_t numElems,
+		const std::string& output_file)
+{
+	thrust::device_vector<unsigned char> d_output_red = d_red;
+
+	const dim3 blockSize(256, 1, 1);
+	const dim3 gridSize( (40 + blockSize.x - 1) / blockSize.x, 1, 1);
+
+	remove_redness_from_coordinates<<<gridSize, blockSize>>>(outputPos,
+								 thrust::raw_pointer_cast(d_red.data()),
+								 thrust::raw_pointer_cast(d_blue.data()),
+								 thrust::raw_pointer_cast(d_green.data()),
+								 thrust::raw_pointer_cast(d_output_red.data()),
+								 40,
+								 numRowsImg, numColsImg,
+								 9, 9);
+
+
+  	cudaDeviceSynchronize(); checkCudaErrors(cudaGetLastError());
+
+	// combine the new red channel with original blue and green for output
+	thrust::device_vector<uchar4> d_outputImg(numElems);
+	
+	thrust::transform(thrust::make_zip_iterator(thrust::make_tuple(
+							d_output_red.begin(),
+							d_blue.begin(),
+							d_green.begin())),
+				                    thrust::make_zip_iterator(thrust::make_tuple(
+				                          d_output_red.end(),
+				                          d_blue.end(),
+				                          d_green.end())),
+				                    d_outputImg.begin(),
+				                    combineChannels());
+
+	thrust::host_vector<uchar4> h_Img = d_outputImg;
+	
+	saveImageRGBA(&h_Img[0], numRowsImg, numColsImg, output_file);
+	
+	/* clear the global vectors otherwise something goes wrong trying to free them
+	 * 	Note:  std::vector.clear() will remove all elements in the vector
+	 * 		std::vector.shrink_to_fit() will delete pre-allocated memory
+	*/
+	d_red.clear(); d_red.shrink_to_fit();
+	d_blue.clear(); d_blue.shrink_to_fit();
+	d_green.clear(); d_green.shrink_to_fit();
 }

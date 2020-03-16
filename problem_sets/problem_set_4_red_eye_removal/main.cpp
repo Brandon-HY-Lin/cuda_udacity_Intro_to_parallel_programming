@@ -1,9 +1,13 @@
+#include <iostream>
+#include "timer.h"
+#include "utils.h"
 #include <string>
 #include <stdio.h>
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
 
 #include "compare.h"
+#include "processing.cuh"
 int main (int argc, char **argv)
 {
 	unsigned int *inputVals;
@@ -42,6 +46,16 @@ int main (int argc, char **argv)
 
 
 	sort_cuda(inputVals, inputPos, outputVals, outputPos, numElems);
+
+  timer.Stop();
+  cudaDeviceSynchronize(); checkCudaErrors(cudaGetLastError());
+  printf("\n");
+  printf("Your code ran in: %f msecs.\n", timer.Elapsed());
+
+
+	// check results and output the red-eye corrected image
+	postProcess(outputVals, outputPos, numElems, output_file);
+	
 	thrust::device_ptr<unsigned int> d_inputVals(inputVals);
 	thrust::device_ptr<unsigned int> d_inputPos(inputPos);
 
@@ -50,6 +64,30 @@ int main (int argc, char **argv)
 													d_inputVals + numElems);
 	thrust::host_vector<unsigned int> h_inputPos(d_inputPos,
 													d_inputPos + numElems);
+
+	thrust::host_vector<unsigned int> h_outputVals(numElems);
+	thrust::host_vector<unsigned int> h_outputPos(numElems);
+	
+	sort_cpu(&h_inputVals[0], &h_inputPos[0],
+							&h_outputVals[0], &h_outputPos[0],
+							numElems);
+
+
+  //postProcess(valsPtr, posPtr, numElems, reference_file);
+
+  //compareImages(reference_file, output_file, useEpsCheck, perPixelError, globalError);
+
+	thrust::device_ptr<unsigned int> d_outputVals(outputVals);
+	thrust::device_ptr<unsigned int> d_outputPos(outputPos);
+	
+	thrust::host_vector<unsigned int> h_yourOutputVals(d_outputVals,
+													d_outputVals + numElems);
+	thrust::host_vector<unsigned int> h_yourOutputPos(d_outputPos,
+													d_outputPos + numElems);
+
+	checkResultsExact(&h_outputVals[0], &h_yourOutputVals[0], numElems);
+	checkResultsExact(&h_outputPos[0], &h_yourOutputPos[0], numElems);
+
 	checkCudaErrors(cudaFree(inputVals));
   	checkCudaErrors(cudaFree(inputPos));
   	checkCudaErrors(cudaFree(outputVals));
