@@ -148,6 +148,16 @@ void sort_cuda(unsigned int* const d_inputVals,
         // scatter d_inputPos to d_outputPos.
         scatter << <gridSize, blockSize >> > (d_inputPos_tmp, d_outputPos_tmp, d_destination, numElems);
     }
+
+    if (d_outputVals != d_outputVals_tmp) {
+        checkCudaErrors(cudaMemcpy(d_outputVals, d_outputVals_tmp, bytes_data, cudaMemcpyDeviceToDevice));
+        swap_address(&d_inputVals_tmp, &d_outputVals_tmp);
+    }
+
+    if (d_outputPos != d_outputPos_tmp) {
+        checkCudaErrors(cudaMemcpy(d_outputPos, d_outputPos_tmp, bytes_data, cudaMemcpyDeviceToDevice));
+        swap_address(&d_inputPos_tmp, &d_outputPos_tmp);
+    }
        
         
     if (d_inputVals_tmp) cudaFree(d_inputVals_tmp);
