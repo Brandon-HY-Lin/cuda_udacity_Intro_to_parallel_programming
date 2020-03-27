@@ -8,6 +8,9 @@
 
 #include "compare.h"
 #include "processing.cuh"
+#include "sort_gpu.cuh"
+#include "sort_cpu.h"
+
 int main (int argc, char **argv)
 {
 	unsigned int *inputVals;
@@ -27,7 +30,7 @@ int main (int argc, char **argv)
 	
 	if (argc == 1) {
 		input_file = "red_eye_effect_5.jpg";
-		template_fie = "red_eye_effect_template_5.jpg";
+		template_file = "red_eye_effect_template_5.jpg";
 		output_file = "output.png";
 	} else if (argc == 3) {
 		input_file  = std::string(argv[1]);

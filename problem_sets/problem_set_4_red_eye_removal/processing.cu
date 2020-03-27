@@ -1,4 +1,4 @@
-#include "processing.cuh"
+//#include "processing.cuh"
 
 #include "utils.h"
 #include <cuda.h>
@@ -17,6 +17,7 @@
 
 #include "loadSaveImage.h"
 #include <stdio.h>
+
 // simple cross correlation kernel copied from Mike's IPython Notebook
 __global__ void naive_normalized_cross_correlation (
 	float*		d_response,
@@ -45,17 +46,19 @@ __global__ void naive_normalized_cross_correlation (
 		//
 		float image_sum = 0.0f;
 		
-		for (int y = -template_half_height; y <= template_half_height; y++) {
-			for (int x = - template_half_width; x < = template_half_width; x++) {
-			int2 image_offset_index_2d		= make_int2( image_index_2d.x + x, image_index_2d.y + y);
-			int2 image_offset_index_2d_clamped 	= make_int2( min ( nx -1, max( 0, image_offset_index_2d.x)), min( ny - 1, max( 0, image_offset_index_2d.y)));
-			int image_offset_index_1d_clamped 	= ( nx * image_offset_index_2d_clamped.y ) + image_offset_index_2d_clamped.x;
+		for (int y = -template_half_height; y <= template_half_height; y++) 
+		{
+			for (int x = - template_half_width; x <= template_half_width; x++) 
+			{
+				int2 image_offset_index_2d		= make_int2( image_index_2d.x + x, image_index_2d.y + y);
+				int2 image_offset_index_2d_clamped 	= make_int2( min ( nx -1, max( 0, image_offset_index_2d.x)), min( ny - 1, max( 0, image_offset_index_2d.y)));
+				int image_offset_index_1d_clamped 	= ( nx * image_offset_index_2d_clamped.y ) + image_offset_index_2d_clamped.x;
 			
-			unsigned char image_offset_value = d_original[ image_offset_index_1d_clamped ];
+				unsigned char image_offset_value = d_original[ image_offset_index_1d_clamped ];
 			
-			image_sum += (float) image_offset_value;
+				image_sum += (float) image_offset_value;
+			}
 		}
-	}
 	
 	float image_mean = image_sum / (float)template_size;
 	
@@ -66,8 +69,10 @@ __global__ void naive_normalized_cross_correlation (
 	float sum_of_squared_image_diffs		= 0.0f;
 	float sum_of_squared_template_diffs		= 0.0f;
 	
-	for (int y = -template_half_height; y <= template_half_height; y++) {
-		for (int x = - template_half_width; x <= template_half_width; x++) {
+	for (int y = -template_half_height; y <= template_half_height; y++) 
+	{
+		for (int x = - template_half_width; x <= template_half_width; x++) 
+		{
 			int2 image_offset_index_2d		= make_int2( image_index_2d.x + x, image_index_2d.y + y);
 			int2 image_offset_index_2d_clamped	= make_int2( min( nx -1, max(0, image_offset_index_2d.x) ), min( ny - 1, max(0, image_offset_index_2d.y ) ) );
 			int  image_offset_index_1d_clamped	= (nx * image_offset_index_2d_clamped.y ) + image_offset_index_2d_clamped.x;
@@ -90,9 +95,11 @@ __global__ void naive_normalized_cross_correlation (
 			sum_of_squared_template_diffs       += squared_template_diff;
 		}
 	}
-		//
-		// compute final result
-		//
+
+
+    //
+    // compute final result
+    //
 		float result_value = 0.0f;
 	
 		if ( sum_of_squared_image_diffs != 0 && sum_of_squared_template_diffs != 0 )
@@ -124,15 +131,15 @@ __global__ void remove_redness_from_coordinates (
 
 	int imgSize = num_pixels_x * num_pixels_y;
 
-	if ( global_index_1d < num_coordinates ) {
-
+	if ( global_index_1d < num_coordinates ) 
+	{
 		unsigned int image_index_1d = d_coordinates[ imgSize - global_index_1d - 1];
 		ushort2 image_index_2d = make_ushort2( image_index_1d % num_pixels_x, image_index_1d / num_pixels_x);
 		
-		for (int y = image_index_2d.y - template_half_height; y <= image_index_2d.y + template_half_height; y++) {
-		
-			for (int x = image_index_2d.x - template_half_width; x <= image_index_2d.x + template_half_width; x++) {
-			
+		for (int y = image_index_2d.y - template_half_height; y <= image_index_2d.y + template_half_height; y++) 
+		{
+			for (int x = image_index_2d.x - template_half_width; x <= image_index_2d.x + template_half_width; x++) 
+			{
 				int2 image_offset_index_2d		= make_int2( x, y);
 				int2 image_offset_index_2d_clamped 	= make_int2( min(nx -1, max(0, image_offset_index_2d.x)), min( ny - 1, max( 0, image_offset_index_2d.y) ) );
 				int  image_offset_index_1d_clamped = (nx * image_offset_index_2d_clamped.y ) + image_offset_index_2d_clamped.x;
@@ -154,31 +161,25 @@ __global__ void remove_redness_from_coordinates (
 //
 // Because C++11 language support makes the functionality of unary_function obsolete, 
 //    its use is optional if C++11 language features are enabled.
-struct splitChannels : thrust::unary_function<uchar4, thrust::tuple<unsigned char, unsigned char, unsigned char> >
-{
+struct splitChannels : thrust::unary_function<uchar4, thrust::tuple<unsigned char, unsigned char, unsigned char> >{
 	__host__ __device__
-	thrust::tuple<unsigned char, unsigned char, unsigned char> operator() (uchar4 pixel) 
-	{
+	thrust::tuple<unsigned char, unsigned char, unsigned char> operator() (uchar4 pixel) {
 		return thrust::make_tuple(pixel.x, pixel.y, pixel.z);
 	}
 };	
 
 
-struct combineChannels : thrust::unary_function<thrust::tuple<unsigned char, unsigned char, unsigned char>, uchar4>
-{
+struct combineChannels : thrust::unary_function<thrust::tuple<unsigned char, unsigned char, unsigned char>, uchar4>{
 	__host__ __device__
-	uchar4 operator() (thrust::tuple<unsigned char, unsigned char, unsigned char> t)
-	{
+	uchar4 operator() (thrust::tuple<unsigned char, unsigned char, unsigned char> t){
 		return make_uchar4(thrust::get<0>(t), thrust::get<1>(t), thrust::get<2>(t), 255);
 	}
 };
 
 
-struct combineResponses : thrust::unary_function<float, thrust::tuple<float, float, float> >
-{
+struct combineResponses : thrust::unary_function<float, thrust::tuple<float, float, float> >{
 	__host__ __device__
-	float operator() (thrust::tuple<float, float, float> t)
-	{
+	float operator() (thrust::tuple<float, float, float> t){
 		return thrust::get<0>(t) * thrust::get<1>(t) * thrust::get<2>(t);
 	}
 };
@@ -216,7 +217,7 @@ void preProcess(unsigned int **inputVals,
 	uchar4 *inImg;
 	uchar4 *eyeTemplate;
 	
-	std::size_t numRowsTemplate, numColsTemplate;
+	size_t numRowsTemplate, numColsTemplate;
 	
 	loadImageRGBA(filename, &inImg, &numRowsImg, &numColsImg);
 	loadImageRGBA(templateFilename, &eyeTemplate, &numRowsTemplate, &numColsTemplate);
@@ -228,7 +229,7 @@ void preProcess(unsigned int **inputVals,
 	// use thrust library to demonstrate basic uses
 	
 	numElem = numRowsImg * numColsImg;
-	std:size_t templateSize = numRowsTemplate * numColsTemplate;
+	size_t templateSize = numRowsTemplate * numColsTemplate;
 	
 	thrust::device_vector<uchar4> d_Img(inImg, inImg + numRowsImg * numColsImg);
 	thrust::device_vector<uchar4> d_Template(eyeTemplate, eyeTemplate + numRowsTemplate * numColsTemplate);
@@ -352,9 +353,8 @@ void preProcess(unsigned int **inputVals,
 
 void postProcess(const unsigned int* const outputVals,
 		const unsigned int* const outputPos,
-		const std::size_t numElems,
-		const std::string& output_file)
-{
+		const size_t numElems,
+		const std::string& output_file){
 	thrust::device_vector<unsigned char> d_output_red = d_red;
 
 	const dim3 blockSize(256, 1, 1);

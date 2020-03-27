@@ -1,6 +1,8 @@
 #ifndef PROCESSING_CUH__
 #define PROCESSING_CUH__
 
+#include <string>
+
 void preProcess(unsigned int** inputVals,
     unsigned int** inputPos,
     unsigned int** outputVals,
